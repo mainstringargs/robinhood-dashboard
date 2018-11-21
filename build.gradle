@@ -26,7 +26,7 @@ apply plugin: 'java-library'
 apply plugin: 'eclipse'
 apply plugin: 'com.bmuschko.nexus'
 
-archivesBaseName = 'gradle-project-bootstrap'
+archivesBaseName = 'robinhood-dashboard'
 group = 'io.github.mainstringargs'
 version = '1.0'
 
@@ -48,12 +48,13 @@ dependencies {
     
     compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.25'
     compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.25'
+	compile "io.github.mainstringargs:robinhood-scraper:1.0"	
 }
 
 /*
 jar {
     manifest {
-        attributes 'Main-Class': 'com.mainstringargs.GradleProjectBootstrap'
+        attributes 'Main-Class': 'com.mainstringargs.robinhoodDashboard.RobinhoodDashboard'
     }
 	
 	from {
@@ -66,14 +67,14 @@ jar {
 
 modifyPom {
     project {
-        name 'gradle-project-bootstrap'
-        description 'Bootstrap Project for Gradle.'
-        url 'https://github.com/mainstringargs/gradle-project-bootstrap'
+        name 'robinhood-dashboard'
+        description 'Dashboard for Robinhood Data'
+        url 'https://github.com/mainstringargs/robinhood-dashboard'
         inceptionYear '2018'
         scm {
-            url 'https://github.com/mainstringargs/gradle-project-bootstrap'
-            connection 'https://github.com/mainstringargs/gradle-project-bootstrap.git'
-            developerConnection 'https://github.com/mainstringargs/gradle-project-bootstrap.git'
+            url 'https://github.com/mainstringargs/robinhood-dashboard'
+            connection 'https://github.com/mainstringargs/robinhood-dashboard.git'
+            developerConnection 'https://github.com/mainstringargs/robinhood-dashboard.git'
         }
         licenses {
             license {
