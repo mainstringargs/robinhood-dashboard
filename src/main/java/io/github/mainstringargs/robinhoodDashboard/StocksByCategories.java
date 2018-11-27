@@ -1,8 +1,11 @@
 package io.github.mainstringargs.robinhoodDashboard;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -15,6 +18,8 @@ import com.ampro.robinhood.endpoint.instrument.data.Instrument;
 import com.ampro.robinhood.throwables.RobinhoodApiException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
 import io.github.mainstringargs.robinhoodDashboard.domain.StockCategories;
 
 public class StocksByCategories {
@@ -34,13 +39,13 @@ public class StocksByCategories {
 
     Map<String, StockCategories> stockCatMap = new HashMap<>();
 
-    List<String> categories = Arrays.asList("new-on-robinhood","etf", "conglomerate", "manufacturing", "health",
-        "100-most-popular", "private-equity", "healthcare", "technology", "payment", "electronics",
-        "telecommunications", "consumer-product", "north-america", "us", "software-service",
-        "rental-and-lease", "shipping", "material", "building-material", "banking",
-        "investment-banking", "finance", "loan", "retail", "packaging", "material", "biotechnology",
-        "etf", "most-popular-under-25", "road-transportation", "construction", "energy",
-        "engineering", "oil", "gas", "transportation");
+    List<String> categories = Arrays.asList("new-on-robinhood", "etf", "conglomerate",
+        "manufacturing", "health", "100-most-popular", "private-equity", "healthcare", "technology",
+        "payment", "electronics", "telecommunications", "consumer-product", "north-america", "us",
+        "software-service", "rental-and-lease", "shipping", "material", "building-material",
+        "banking", "investment-banking", "finance", "loan", "retail", "packaging", "material",
+        "biotechnology", "etf", "most-popular-under-25", "road-transportation", "construction",
+        "energy", "engineering", "oil", "gas", "transportation");
 
     for (String category : categories) {
 
@@ -107,6 +112,24 @@ public class StocksByCategories {
     } catch (Exception e) {
       System.out.println("Error getting " + catName);
     }
+
+  }
+
+  public static List<StockCategories> getStockCategories() {
+
+    JsonReader jsonReader = null;
+    try {
+      jsonReader = new JsonReader(new FileReader("src/main/resources/StocksByCategories.json"));
+    } catch (FileNotFoundException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+
+    Type listType = new TypeToken<List<StockCategories>>() {}.getType();
+
+    List<StockCategories> jsonList = new Gson().fromJson(jsonReader, listType);
+
+    return jsonList;
 
   }
 }

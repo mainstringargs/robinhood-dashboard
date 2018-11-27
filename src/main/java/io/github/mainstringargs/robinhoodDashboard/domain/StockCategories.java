@@ -1,12 +1,13 @@
 package io.github.mainstringargs.robinhoodDashboard.domain;
 
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 public class StockCategories {
 
   private String ticker;
   private String stockName;
-  private ArrayList<String> categories = new ArrayList<>();
+  private Set<String> categories = new LinkedHashSet<>();
 
 
 
@@ -14,7 +15,7 @@ public class StockCategories {
     return ticker;
   }
 
-  public ArrayList<String> getCategories() {
+  public Set<String> getCategories() {
     return categories;
   }
 
