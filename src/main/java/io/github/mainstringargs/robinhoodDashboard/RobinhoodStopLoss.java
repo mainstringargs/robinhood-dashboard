@@ -8,7 +8,7 @@ import com.ampro.robinhood.endpoint.account.data.Position;
 import com.ampro.robinhood.throwables.RobinhoodApiException;
 import com.ampro.robinhood.throwables.TickerNotFoundException;
 
-public class RobinhoodDashboard {
+public class RobinhoodStopLoss {
 
   public static void main(String[] args) {
     RobinhoodApi rApi = null;
