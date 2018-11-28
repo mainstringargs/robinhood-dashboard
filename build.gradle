@@ -48,9 +48,9 @@ dependencies {
     
     compile group: 'org.slf4j', name:'slf4j-api', version: '1.7.25'
     compile group: 'org.slf4j', name:'slf4j-log4j12', version: '1.7.25'
-	compile "io.github.mainstringargs:robinhood-scraper:1.1"	
-	compile "io.github.mainstringargs:yahoo-finance-scraper:1.0"
-	compile "io.github.mainstringargs:stock-data-spi:1.0"	
+	compile "io.github.mainstringargs:robinhood-scraper:1.2"	
+	compile "io.github.mainstringargs:yahoo-finance-scraper:1.1"
+	compile "io.github.mainstringargs:stock-data-spi:1.1"	
 }
 
 /*

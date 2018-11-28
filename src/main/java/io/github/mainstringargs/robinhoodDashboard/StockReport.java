@@ -23,9 +23,9 @@ public class StockReport {
     List<StockCategories> rhStocks = StocksByCategories.getStockCategories();
 
 
-    List<StockDataService> services = StockDataServiceLoader.getStockDataServices();
+    Map<String, StockDataService> services = StockDataServiceLoader.getStockDataServices();
 
-    for (StockDataService service : services) {
+    for (StockDataService service : services.values()) {
       service.init();
     }
 
@@ -39,10 +39,9 @@ public class StockReport {
 
     for (StockCategories stock : rhStocks) {
 
-      for (StockDataService service : services) {
+      for (StockDataService service : services.values()) {
         try {
-          Map<String, Map<String, Object>> stockDataFromService =
-              (service.getStockData(stock.getTicker()));
+          Map<String, Object> stockDataFromService = (service.getStockData(stock.getTicker()));
 
 
           if (stockDataFromService.containsKey(stock.getTicker())) {
@@ -53,8 +52,7 @@ public class StockReport {
               stockData.put(stock.getTicker(), map);
             }
 
-            for (Entry<String, Object> entry : stockDataFromService.get(stock.getTicker())
-                .entrySet()) {
+            for (Entry<String, Object> entry : stockDataFromService.entrySet()) {
 
               String key = service.getServiceName().substring(0, 1) + "-" + entry.getKey();
               keySet.add(key);
