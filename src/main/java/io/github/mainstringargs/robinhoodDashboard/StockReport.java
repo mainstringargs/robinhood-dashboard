@@ -54,7 +54,7 @@ public class StockReport {
 
             for (Entry<String, Object> entry : stockDataFromService.entrySet()) {
 
-              String key = service.getServiceName().substring(0, 1) + "-" + entry.getKey();
+              String key = service.getShortServiceName() + "-" + entry.getKey();
               keySet.add(key);
 
               map.put(key, entry.getValue());
