@@ -39,31 +39,31 @@ public class StockReport {
 
     for (StockCategories stock : rhStocks) {
 
+
       for (StockDataService service : services.values()) {
         try {
           Map<String, Object> stockDataFromService = (service.getStockData(stock.getTicker()));
 
 
-          if (stockDataFromService.containsKey(stock.getTicker())) {
-            LinkedHashMap<String, Object> map = stockData.get(stock.getTicker());
+          LinkedHashMap<String, Object> map = stockData.get(stock.getTicker());
 
-            if (map == null) {
-              map = new LinkedHashMap<>();
-              stockData.put(stock.getTicker(), map);
-            }
-
-            for (Entry<String, Object> entry : stockDataFromService.entrySet()) {
-
-              String key = service.getShortServiceName() + "-" + entry.getKey();
-              keySet.add(key);
-
-              map.put(key, entry.getValue());
-            }
-
-
-            System.out.println(service.getServiceName() + " " + stock.getTicker() + " " + map);
-
+          if (map == null) {
+            map = new LinkedHashMap<>();
+            stockData.put(stock.getTicker(), map);
           }
+
+          for (Entry<String, Object> entry : stockDataFromService.entrySet()) {
+
+            String key = service.getShortServiceName() + "-" + entry.getKey();
+            keySet.add(key);
+
+            map.put(key, entry.getValue());
+          }
+
+
+          System.out.println(service.getServiceName() + " " + stock.getTicker() + " " + map);
+
+
         } catch (Exception e) {
           // TODO Auto-generated catch block
           e.printStackTrace();
