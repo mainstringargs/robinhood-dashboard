@@ -19,7 +19,7 @@ public class QQQPlayground {
   };
 
 
-  public static int MAX = 5;
+  public static int MAX = 20;
 
   public static void main(String[] args) {
 
@@ -93,7 +93,7 @@ public class QQQPlayground {
 
 
       try {
-        Thread.sleep(60000);
+        Thread.sleep(15000);
       } catch (InterruptedException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
