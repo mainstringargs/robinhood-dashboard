@@ -6,9 +6,12 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import com.ampro.robinhood.RobinhoodApi;
 import com.ampro.robinhood.endpoint.account.data.Position;
+import com.ampro.robinhood.endpoint.instrument.data.Instrument;
 import com.ampro.robinhood.endpoint.markets.data.Market;
 import com.ampro.robinhood.endpoint.markets.data.MarketHours;
 import com.ampro.robinhood.endpoint.markets.data.MarketList;
@@ -25,7 +28,8 @@ public class RobinhoodTrailingStopLoss {
   private static String marketAcronym = "NASDAQ";
   private static long stopLossUpdateIntervalMs = 1000;
   private static long cancelStopLossUpdateIntervalMs = 5000;
-  private static double stopLossPercent = .05;
+  private static long stockMarketSleepTime = 1000 * 60 * 10;
+  private static double stopLossPercent = .01;
   private static int quantity = 4;
   private static DecimalFormat df2 = new DecimalFormat("###,###.00");
 
@@ -43,66 +47,113 @@ public class RobinhoodTrailingStopLoss {
     }
 
     float lastValue = 0;
-    float setStopLoss = 0;
-    SecurityOrder standingStopLoss = null;
 
+    SecurityOrder standingStopLoss = findExistingStopLossOrder(rApi, ticker);
 
-    while (stockMarketIsOpen(rApi) && tickerIsOwnedAtQuanity(rApi, ticker, quantity)) {
+    float setStopLoss = (float) standingStopLoss.getStopPrice();
 
-      TickerQuote currentQuote = null;
-      try {
-        currentQuote = rApi.getQuoteByTicker(ticker);
-      } catch (TickerNotFoundException e1) {
-        // TODO Auto-generated catch block
-        e1.printStackTrace();
-      }
+    System.out.println("Found existing stopLoss @ " + setStopLoss);
 
-      float currentValue = currentQuote.getLastTradePrice();
+    boolean firstStockMarketClosed = false;
 
+    while (true) {
 
-      System.out.println(
-          new Date() + ": " + "Current Val of " + ticker + " is " + df2.format(currentValue));
-
-
-
-      float calculatedStopLoss = (float) (currentValue - (currentValue * stopLossPercent));
-
-      System.out.println(new Date() + ": " + "Set stop loss " + df2.format(setStopLoss)
-          + " Calculated stop loss " + df2.format(calculatedStopLoss));
-
-      if (calculatedStopLoss > setStopLoss) {
-
-        if (setStopLoss > 0 && standingStopLoss != null) {
-          cancelExistingStopLoss(rApi, ticker, standingStopLoss);
+      if (!stockMarketIsOpen(rApi)) {
+        
+        if(!firstStockMarketClosed) {
+          firstStockMarketClosed = true;
+          System.out.print(new Date() + ": Stock market is closed");
+        } else {
+          System.out.print(".");
         }
 
         try {
-          Thread.sleep(cancelStopLossUpdateIntervalMs);
+          Thread.sleep(stockMarketSleepTime);
         } catch (InterruptedException e) {
           // TODO Auto-generated catch block
           e.printStackTrace();
         }
 
+      } else if (tickerIsOwnedAtQuanity(rApi, ticker, quantity)) {
+        
+        firstStockMarketClosed = false;
+        System.out.println();
+        
+        TickerQuote currentQuote = null;
+        try {
+          currentQuote = rApi.getQuoteByTicker(ticker);
+        } catch (TickerNotFoundException e1) {
+          // TODO Auto-generated catch block
+          e1.printStackTrace();
+        }
 
-        standingStopLoss = submitNewStopLoss(rApi, ticker, calculatedStopLoss);
+        float currentValue = currentQuote.getLastTradePrice();
 
 
-        setStopLoss = calculatedStopLoss;
+        System.out.println(
+            new Date() + ": " + "Current Val of " + ticker + " is " + df2.format(currentValue));
+
+
+
+        float calculatedStopLoss = (float) (currentValue - (currentValue * stopLossPercent));
+
+        System.out.println(new Date() + ": " + "Set stop loss " + df2.format(setStopLoss)
+            + " Calculated stop loss " + df2.format(calculatedStopLoss));
+
+        if (calculatedStopLoss > setStopLoss) {
+
+          if (setStopLoss > 0 && standingStopLoss != null) {
+            cancelExistingStopLoss(rApi, ticker, standingStopLoss);
+          }
+
+          try {
+            Thread.sleep(cancelStopLossUpdateIntervalMs);
+          } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+
+
+          standingStopLoss = submitNewStopLoss(rApi, ticker, calculatedStopLoss);
+
+
+          setStopLoss = calculatedStopLoss;
+        }
+
+
+
+        try {
+          Thread.sleep(stopLossUpdateIntervalMs);
+        } catch (InterruptedException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+
+        lastValue = currentValue;
       }
 
+    }
+  }
 
+  private static SecurityOrder findExistingStopLossOrder(RobinhoodApi rApi, String ticker) {
 
-      try {
-        Thread.sleep(stopLossUpdateIntervalMs);
-      } catch (InterruptedException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+    List<SecurityOrder> orders = rApi.getOrders();
+
+    for (SecurityOrder order : orders) {
+
+      if (order.getTrigger().equals("stop") && order.getCancel() != null) {
+
+        Instrument inst = rApi.getInstrumentByURL(order.getInstrument());
+
+        if (inst.getSymbol().equals(ticker)) {
+          return order;
+        }
+
       }
 
-      lastValue = currentValue;
     }
 
-
+    return null;
   }
 
   private static boolean tickerIsOwnedAtQuanity(RobinhoodApi rApi, String ticker,
