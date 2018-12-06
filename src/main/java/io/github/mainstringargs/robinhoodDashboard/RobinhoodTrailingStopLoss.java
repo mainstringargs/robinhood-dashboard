@@ -30,13 +30,13 @@ public class RobinhoodTrailingStopLoss {
   private static long cancelStopLossUpdateIntervalMs = 5000;
   private static long stockMarketSleepTime = 1000 * 60 * 10;
   private static double stopLossPercent = .01;
-  private static int quantity = 4;
+  private static int quantity = 1;
   private static DecimalFormat df2 = new DecimalFormat("###,###.00");
 
 
   public static void main(String[] args) {
     // String ticker = args[0];
-    String ticker = "SQQQ";
+    String ticker = "TQQQ";
 
     RobinhoodApi rApi = null;
     try {
@@ -50,17 +50,21 @@ public class RobinhoodTrailingStopLoss {
 
     SecurityOrder standingStopLoss = findExistingStopLossOrder(rApi, ticker);
 
-    float setStopLoss = (float) standingStopLoss.getStopPrice();
+    float setStopLoss = standingStopLoss == null ? 0.0f : (float) standingStopLoss.getStopPrice();
 
-    System.out.println("Found existing stopLoss @ " + setStopLoss);
+    if (setStopLoss > 0.0) {
+      System.out.println("Found existing stopLoss @ " + setStopLoss);
+    } else {
+      System.out.println("No existing stoploss");
+    }
 
     boolean firstStockMarketClosed = false;
 
     while (true) {
 
       if (!stockMarketIsOpen(rApi)) {
-        
-        if(!firstStockMarketClosed) {
+
+        if (!firstStockMarketClosed) {
           firstStockMarketClosed = true;
           System.out.print(new Date() + ": Stock market is closed");
         } else {
@@ -75,10 +79,10 @@ public class RobinhoodTrailingStopLoss {
         }
 
       } else if (tickerIsOwnedAtQuanity(rApi, ticker, quantity)) {
-        
+
         firstStockMarketClosed = false;
         System.out.println();
-        
+
         TickerQuote currentQuote = null;
         try {
           currentQuote = rApi.getQuoteByTicker(ticker);
@@ -184,10 +188,14 @@ public class RobinhoodTrailingStopLoss {
       e.printStackTrace();
     }
 
-    System.out.println(new Date() + ": Cancel stop loss for " + ticker + " "
-        + order.getRejectReason() + " " + order.getAveragePrice() + " "
-        + order.getCumulativeQuantity() + " " + order.getResponseCategory() + " "
-        + order.getTransactionStateAsString() + " " + order.getTrigger());
+    if (order != null) {
+      System.out.println(new Date() + ": Cancel stop loss for " + ticker + " "
+          + order.getRejectReason() + " " + order.getAveragePrice() + " "
+          + order.getCumulativeQuantity() + " " + order.getResponseCategory() + " "
+          + order.getTransactionStateAsString() + " " + order.getTrigger());
+    } else {
+      System.out.println("Returned order is null.  Not sure why");
+    }
 
     return order;
   }
@@ -203,11 +211,15 @@ public class RobinhoodTrailingStopLoss {
       e.printStackTrace();
     }
 
-    System.out.println(new Date() + ": New stop loss for " + ticker + " to " + df2.format(stopLoss)
-        + " " + order.getRejectReason() + " " + order.getAveragePrice() + " "
-        + order.getCumulativeQuantity() + " " + order.getResponseCategory() + " "
-        + order.getTransactionStateAsString() + " " + order.getTrigger());
+    if (order != null) {
 
+      System.out.println(new Date() + ": New stop loss for " + ticker + " to "
+          + df2.format(stopLoss) + " " + order.getRejectReason() + " " + order.getAveragePrice()
+          + " " + order.getCumulativeQuantity() + " " + order.getResponseCategory() + " "
+          + order.getTransactionStateAsString() + " " + order.getTrigger());
+    } else {
+      System.out.println("Returned order is null.  Not sure why");
+    }
 
     return order;
   }
