@@ -36,7 +36,9 @@ public class RobinhoodTrailingStopLoss {
 
   public static void main(String[] args) {
     // String ticker = args[0];
-    String ticker = "TQQQ";
+    String ticker = "SQQQ";
+    quantity  = 2;
+    stopLossPercent = .01;
 
     RobinhoodApi rApi = null;
     try {
@@ -134,6 +136,10 @@ public class RobinhoodTrailingStopLoss {
         }
 
         lastValue = currentValue;
+      } else {
+        System.out.println("clearing out stop loss " + setStopLoss);
+        setStopLoss = 0.0f;
+        standingStopLoss = null;
       }
 
     }
