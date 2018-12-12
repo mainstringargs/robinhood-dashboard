@@ -39,6 +39,11 @@ public class RobinhoodAccountTrailingStopLoss {
   private static List<String> tickersToIgnore =
       new ArrayList<String>(Arrays.asList("GOOGL", "AMZN"));
 
+  private static List<String> halfStopLossPercentStocks = new ArrayList<String>(
+      Arrays.asList("BILI", "AGEN", "MITK", "COLD", "DM", "TSRO", "FE", "VNET", "GLUU", "NOK"));
+
+
+  private static Map<String, Integer> numStopLossChanges = new HashMap<String, Integer>();
 
   public static void main(String[] args) {
     // String ticker = args[0];
@@ -116,7 +121,38 @@ public class RobinhoodAccountTrailingStopLoss {
 
         for (Position pos : acctPositions) {
 
-          String ticker = pos.getInstrumentElement().getSymbol();
+          String ticker = null;
+          try {
+            ticker = pos.getInstrumentElement().getSymbol();
+          } catch (Exception e2) {
+            try {
+              Thread.sleep(stopLossUpdateIntervalMs);
+            } catch (InterruptedException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
+
+            try {
+              ticker = pos.getInstrumentElement().getSymbol();
+            } catch (Exception e) {
+              try {
+                Thread.sleep(stopLossUpdateIntervalMs);
+              } catch (InterruptedException e3) {
+                // TODO Auto-generated catch block
+                e3.printStackTrace();
+              }
+
+              try {
+                ticker = pos.getInstrumentElement().getSymbol();
+              } catch (Exception e4) {
+                // TODO Auto-generated catch block
+                e4.printStackTrace();
+                continue;
+              }
+            }
+          }
+
+
 
           if (tickersToIgnore.contains(ticker)) {
             continue;
@@ -139,12 +175,17 @@ public class RobinhoodAccountTrailingStopLoss {
               ? currentStopLosses.get(ticker).getStopPrice()
               : 0.0f);
 
-          System.out.println(
-              new Date() + ": " + "Current Val of " + ticker + " is " + df2.format(currentValue));
+          System.out.println(new Date() + ": " + "Current Val of " + ticker + " is "
+              + df2.format(currentValue) + " numStopLossUpdates: "
+              + (numStopLossChanges.containsKey(ticker) ? numStopLossChanges.get(ticker) : "N/A"));
 
 
 
-          float calculatedStopLoss = (float) (currentValue - (currentValue * stopLossPercent));
+          float stopLossValue =
+              (float) (halfStopLossPercentStocks.contains(ticker) ? stopLossPercent / 2.0f
+                  : stopLossPercent);
+
+          float calculatedStopLoss = (float) (currentValue - (currentValue * stopLossValue));
 
           System.out
               .println(new Date() + ": " + ticker + " Set stop loss " + df2.format(setStopLoss)
@@ -163,12 +204,23 @@ public class RobinhoodAccountTrailingStopLoss {
               e.printStackTrace();
             }
 
+            Integer numStopLosses = numStopLossChanges.get(ticker);
+
+            if (numStopLosses == null) {
+              numStopLosses = 0;
+            }
+
+            numStopLosses++;
+            numStopLossChanges.put(ticker, numStopLosses);
+
 
             currentStopLosses.put(ticker,
                 submitNewStopLoss(rApi, ticker, (int) pos.getQuantity(), calculatedStopLoss));
 
 
             setStopLoss = calculatedStopLoss;
+
+
           }
 
 
@@ -280,7 +332,8 @@ public class RobinhoodAccountTrailingStopLoss {
       System.out.println(new Date() + ": New stop loss for " + ticker + " to "
           + df2.format(stopLoss) + " " + order.getRejectReason() + " " + order.getAveragePrice()
           + " " + order.getCumulativeQuantity() + " " + order.getResponseCategory() + " "
-          + order.getTransactionStateAsString() + " " + order.getTrigger());
+          + order.getTransactionStateAsString() + " " + order.getTrigger() + " numStopLossUpdates: "
+          + numStopLossChanges.get(ticker));
     } else {
       System.out.println("Returned order is null.  Not sure why");
     }
