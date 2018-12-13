@@ -13,6 +13,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import org.patriques.AlphaVantageConnector;
+import org.patriques.TechnicalIndicators;
+import org.patriques.input.technicalindicators.Interval;
+import org.patriques.input.technicalindicators.SeriesType;
+import org.patriques.input.technicalindicators.TimePeriod;
+import org.patriques.output.technicalindicators.RSI;
 import java.util.Set;
 import com.ampro.robinhood.RobinhoodApi;
 import com.ampro.robinhood.endpoint.account.data.Position;
@@ -26,6 +32,7 @@ import com.ampro.robinhood.endpoint.orders.enums.TimeInForce;
 import com.ampro.robinhood.endpoint.quote.data.TickerQuote;
 import com.ampro.robinhood.throwables.RobinhoodApiException;
 import com.ampro.robinhood.throwables.TickerNotFoundException;
+import io.github.mainstringargs.alphaVantageScraper.AlphaVantageAPIKey;
 
 public class RobinhoodAccountTrailingStopLoss {
 
@@ -39,9 +46,10 @@ public class RobinhoodAccountTrailingStopLoss {
   private static List<String> tickersToIgnore =
       new ArrayList<String>(Arrays.asList("GOOGL", "AMZN"));
 
-  private static List<String> halfStopLossPercentStocks = new ArrayList<String>(
-      Arrays.asList("BILI", "AGEN", "MITK", "COLD", "DM", "TSRO", "FE", "VNET", "GLUU", "NOK"));
+  private static List<String> halfStopLossPercentStocks =
+      new ArrayList<String>(Arrays.asList("SRRK", "FE", "COLD", "TSRO", "PG"));
 
+  private static Map<String, Double> rsiValue = new HashMap<String, Double>();
 
   private static Map<String, Integer> numStopLossChanges = new HashMap<String, Integer>();
 
@@ -56,6 +64,12 @@ public class RobinhoodAccountTrailingStopLoss {
       e.printStackTrace();
     }
 
+    String apiKey = AlphaVantageAPIKey.getAPIKey();
+    int timeout = 3000;
+    AlphaVantageConnector apiConnector = new AlphaVantageConnector(apiKey, timeout);
+    TechnicalIndicators ti = new TechnicalIndicators(apiConnector);
+
+
     List<Position> acctPositions = rApi.getAccountPositions();
 
     Map<String, SecurityOrder> currentStopLosses = new HashMap<>();
@@ -63,7 +77,9 @@ public class RobinhoodAccountTrailingStopLoss {
     List<SecurityOrder> orders = rApi.getOrders();
 
     for (Position pos : acctPositions) {
+
       String ticker = pos.getInstrumentElement().getSymbol();
+
       System.out.println("Searching for " + ticker + " stop loss");
       try {
         SecurityOrder standingStopLoss = findExistingStopLossOrder(rApi, ticker, orders);
@@ -82,10 +98,9 @@ public class RobinhoodAccountTrailingStopLoss {
         tickersToIgnore.add(ticker);
       }
 
-
     }
 
-
+    refreshRSI(rApi, ti);
 
     boolean firstStockMarketClosed = false;
 
@@ -110,8 +125,12 @@ public class RobinhoodAccountTrailingStopLoss {
           e.printStackTrace();
         }
 
-      } else {
 
+
+      } else {
+        if (firstStockMarketClosed) {
+          refreshRSI(rApi, ti);
+        }
 
         firstStockMarketClosed = false;
 
@@ -171,13 +190,16 @@ public class RobinhoodAccountTrailingStopLoss {
 
           float currentValue = currentQuote.getLastTradePrice();
 
-          float setStopLoss = (float) (currentStopLosses.containsKey(ticker)
+          float setStopLoss = (float) (currentStopLosses.get(ticker) != null
               ? currentStopLosses.get(ticker).getStopPrice()
               : 0.0f);
 
+
           System.out.println(new Date() + ": " + "Current Val of " + ticker + " is "
               + df2.format(currentValue) + " numStopLossUpdates: "
-              + (numStopLossChanges.containsKey(ticker) ? numStopLossChanges.get(ticker) : "N/A"));
+              + (numStopLossChanges.containsKey(ticker) ? numStopLossChanges.get(ticker) : "N/A")
+
+              + " rsi: " + (rsiValue.containsKey(ticker) ? rsiValue.get(ticker) : "N/A"));
 
 
 
@@ -250,6 +272,36 @@ public class RobinhoodAccountTrailingStopLoss {
           }
         }
 
+      }
+    }
+
+  }
+
+  private static void refreshRSI(RobinhoodApi rApi, TechnicalIndicators ti) {
+
+    for (Position pos : rApi.getAccountPositions()) {
+
+      String ticker = pos.getInstrumentElement().getSymbol();
+
+      RSI rsi = null;
+      try {
+        rsi = ti.rsi(ticker, Interval.FIFTEEN_MIN, TimePeriod.of(5), SeriesType.CLOSE);
+      } catch (Exception e1) {
+        // TODO Auto-generated catch block
+        e1.printStackTrace();
+      }
+
+      if (rsi != null && rsi.getData() != null && !rsi.getData().isEmpty()) {
+        rsiValue.put(ticker, rsi.getData().get(rsi.getData().size() - 1).getData());
+      }
+
+      System.out.println("Got RSI Data for " + ticker + " " + rsiValue.get(ticker));
+      // to get around API limits
+      try {
+        Thread.sleep(20000L);
+      } catch (InterruptedException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
       }
     }
 
