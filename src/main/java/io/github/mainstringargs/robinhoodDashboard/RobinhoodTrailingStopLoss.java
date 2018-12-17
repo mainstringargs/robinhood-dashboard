@@ -229,61 +229,86 @@ public class RobinhoodTrailingStopLoss {
 
     return order;
   }
+  
+  
 
   private static boolean stockMarketIsOpen(RobinhoodApi rApi) {
     MarketList mList = rApi.getMarketList();
 
-    List<Market> markList = mList.getResults();
-    Market nasdaq = null;
-    for (Market market : markList) {
-      if (market.getAcronym().equals(marketAcronym)) {
-        nasdaq = market;
-        break;
+    for (int i = 0; i < 10; i++) {
+      if (mList == null) {
+
+        try {
+          Thread.sleep(i * 1000);
+        } catch (InterruptedException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+
+        mList = rApi.getMarketList();
+
+        if (mList != null) {
+          break;
+        }
       }
     }
 
-    if (nasdaq != null) {
-      MarketHours hours = rApi.getMarketHoursByURL(nasdaq.getTodaysHours());
-
-      if (!hours.getIsOpen()) {
-        return false;
-      }
-
-      Date openingTime = null;
-      Date closingTime = null;
-      if (!useExtendedHours) {
-        try {
-          openingTime = toCalendar(hours.getOpensAt()).getTime();
-        } catch (ParseException e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
-        }
-        try {
-          closingTime = toCalendar(hours.getClosesAt()).getTime();
-        } catch (ParseException e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
-        }
-      } else {
-        try {
-          openingTime = toCalendar(hours.getExtendedOpensAt()).getTime();
-        } catch (ParseException e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
-        }
-        try {
-          closingTime = toCalendar(hours.getExtendedClosesAt()).getTime();
-        } catch (ParseException e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+    if (mList != null) {
+      List<Market> markList = mList.getResults();
+      Market nasdaq = null;
+      for (Market market : markList) {
+        if (market.getAcronym().equals(marketAcronym)) {
+          nasdaq = market;
+          break;
         }
       }
 
-      Date currentTime = new Date(System.currentTimeMillis());
+      if (nasdaq != null) {
+        MarketHours hours = rApi.getMarketHoursByURL(nasdaq.getTodaysHours());
 
-      return (openingTime.before(currentTime) && closingTime.after(currentTime));
+        if (!hours.getIsOpen()) {
+          return false;
+        }
+
+        Date openingTime = null;
+        Date closingTime = null;
+        if (!useExtendedHours) {
+          try {
+            openingTime = toCalendar(hours.getOpensAt()).getTime();
+          } catch (ParseException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+          try {
+            closingTime = toCalendar(hours.getClosesAt()).getTime();
+          } catch (ParseException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+        } else {
+          try {
+            openingTime = toCalendar(hours.getExtendedOpensAt()).getTime();
+          } catch (ParseException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+          try {
+            closingTime = toCalendar(hours.getExtendedClosesAt()).getTime();
+          } catch (ParseException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+        }
+
+        Date currentTime = new Date(System.currentTimeMillis());
+
+        return (openingTime.before(currentTime) && closingTime.after(currentTime));
 
 
+      }
+    }
+    if (mList == null) {
+      System.err.println("Robinhood is broken!");
     }
 
     return false;
