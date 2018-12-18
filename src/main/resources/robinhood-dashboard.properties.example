@@ -1,2 +1,5 @@
 robinhood.user=<user here>
 robinhood.pass=<password>
+
+postMarketClose.command=
+postMarketClose.workingDirectory=

@@ -45,11 +45,11 @@ public class RobinhoodAccountTrailingStopLoss {
   private static double lockInMultiple = .01;
   private static DecimalFormat df2 = new DecimalFormat("###,###.00");
   private static List<String> tickersToIgnore =
-      new ArrayList<String>(Arrays.asList("GOOGL", "AMZN"));
+      new ArrayList<String>(Arrays.asList("GRVY", "GOOGL", "AMZN", "MSEX"));
 
-  private static List<String> shortTermStocks =
-      new ArrayList<String>(Arrays.asList("AKTS", "SQQQ", "TQQQ", "DFFN", "NOK", "CPSI", "CJJD",
-          "VNET", "BIOS", "SSRM", "COLD", "CNP", "BEL", "GRVY", "MSEX", "SCG", "SPA"));
+  private static List<String> shortTermStocks = new ArrayList<String>(
+      Arrays.asList("AKTS", "SQQQ", "TQQQ", "DFFN", "NOK", "CPSI", "CJJD", "VNET", "BIOS", "SSRM",
+          "COLD", "CNP", "BEL", "MSEX", "SCG", "SPA", "UPL", "CRMD", "FLO", "MITK", "XBIT"));
 
   private static List<String> halfStopLossPercentStocks = new ArrayList<String>(Arrays.asList());
 
@@ -78,7 +78,7 @@ public class RobinhoodAccountTrailingStopLoss {
 
     Map<String, SecurityOrder> currentStopLosses = new HashMap<>();
 
-    List<SecurityOrder> orders = rApi.getOrders();
+    List<SecurityOrder> orders = getOrdersSafe(rApi);
 
     for (Position pos : acctPositions) {
 
@@ -94,7 +94,7 @@ public class RobinhoodAccountTrailingStopLoss {
           System.out.println("Found existing stopLoss for " + ticker + " @ " + setStopLoss);
           currentStopLosses.put(ticker, standingStopLoss);
         } else {
-          System.out.println(ticker + " No existing stoploss");
+          System.out.println("!!!!!!!!!!!!! " + ticker + " No existing stoploss");
         }
       } catch (Exception e) {
         e.printStackTrace();
@@ -116,8 +116,19 @@ public class RobinhoodAccountTrailingStopLoss {
 
 
         if (!firstStockMarketClosed) {
+
           firstStockMarketClosed = true;
           System.out.print(new Date() + ": Stock market is closed");
+
+          try {
+            Thread.sleep(stockMarketSleepTime);
+          } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+
+          //for post market processing
+          PostMarketCloseCommand.runCommand();
         } else {
           System.out.print(".");
         }
@@ -142,6 +153,8 @@ public class RobinhoodAccountTrailingStopLoss {
 
         acctPositions = getAccountPositionsSafe(rApi);
 
+        List<SecurityOrder> latestOrders = getOrdersSafe(rApi);
+
         for (Position pos : acctPositions) {
 
           String ticker = getTickerSafe(rApi, pos);
@@ -156,9 +169,18 @@ public class RobinhoodAccountTrailingStopLoss {
 
           float currentValue = currentQuote.getLastTradePrice();
 
-          float setStopLoss = (float) (currentStopLosses.get(ticker) != null
-              ? currentStopLosses.get(ticker).getStopPrice()
-              : 0.0f);
+          SecurityOrder latestOrderForTicker =
+              findExistingStopLossOrder(rApi, ticker, latestOrders);
+          double setStopLoss = 0.0f;
+          if (latestOrderForTicker != null) {
+
+            setStopLoss = latestOrderForTicker.getStopPrice();
+          } else {
+            // setStopLoss = (float) (currentStopLosses.get(ticker) != null
+            // ? currentStopLosses.get(ticker).getStopPrice()
+            // : 0.0f);
+
+          }
 
           System.out.println(new Date() + ": " + "Current Val of " + ticker + " is "
               + df2.format(currentValue) + " numStopLossUpdates: "
@@ -166,8 +188,8 @@ public class RobinhoodAccountTrailingStopLoss {
               + " rsi: " + (rsiValue.containsKey(ticker) ? rsiValue.get(ticker) : "N/A"));
 
 
-          float calculatedStopLoss = getStopLossCalculatedValue(ticker, pos.getAverageBuyPrice(),
-              currentValue, setStopLoss);
+          double calculatedStopLoss = getStopLossCalculatedValue(ticker, pos.getAverageBuyPrice(),
+              currentValue, setStopLoss) - .01;
 
           System.out
               .println(new Date() + ": " + ticker + " Set stop loss " + df2.format(setStopLoss)
@@ -239,13 +261,49 @@ public class RobinhoodAccountTrailingStopLoss {
 
   }
 
-  private static float getStopLossCalculatedValue(String ticker, float averageBuyPrice,
-      float currentValue, float setStopLoss) {
-    float stopLossValue =
-        (float) (halfStopLossPercentStocks.contains(ticker) ? stopLossPercent / 2.0f
+  private static List<SecurityOrder> getOrdersSafe(RobinhoodApi rApi) {
+    List<SecurityOrder> orders = null;
+    try {
+      orders = rApi.getOrders();
+    } catch (Exception e1) {
+      // TODO Auto-generated catch block
+      e1.printStackTrace();
+    }
+
+
+    for (int i = 0; i < 10; i++) {
+      if (orders == null) {
+
+        try {
+          Thread.sleep(i * 1000);
+        } catch (InterruptedException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+
+        try {
+          orders = rApi.getOrders();
+        } catch (Exception e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+
+        if (orders != null) {
+          break;
+        }
+      }
+    }
+
+    return orders;
+  }
+
+  private static double getStopLossCalculatedValue(String ticker, double averageBuyPrice,
+      double currentValue, double setStopLoss) {
+    double stopLossValue =
+        (double) (halfStopLossPercentStocks.contains(ticker) ? stopLossPercent / 2.0f
             : stopLossPercent);
 
-    float calculatedStopLoss = (float) (currentValue - (currentValue * stopLossValue));
+    double calculatedStopLoss = (double) (currentValue - (currentValue * stopLossValue));
 
     boolean isShortTermGain = false;
 
@@ -388,10 +446,12 @@ public class RobinhoodAccountTrailingStopLoss {
     for (SecurityOrder order : orders) {
 
       if (order.getTrigger().equals("stop") && order.getCancel() != null) {
-
         Instrument inst = rApi.getInstrumentByURL(order.getInstrument());
 
         if (inst.getSymbol().equals(ticker)) {
+
+          // System.out.println(">>EXISTING " + ticker + " " + order.getRejectReason() + " "
+          // + order.getTransactionState() + " " + order.getResponseCategory());
           return order;
         }
 
@@ -467,12 +527,12 @@ public class RobinhoodAccountTrailingStopLoss {
   }
 
   private static SecurityOrder submitNewStopLoss(RobinhoodApi rApi, String ticker, int quantity,
-      float stopLoss) {
+      double stopLoss) {
 
     SecurityOrder order = null;
     try {
       order = rApi.makeMarketStopOrder(ticker, quantity, OrderTransactionType.SELL,
-          TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss - .01));
+          TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss));
     } catch (TickerNotFoundException e) {
       // // TODO Auto-generated catch block
       // e.printStackTrace();
@@ -490,7 +550,7 @@ public class RobinhoodAccountTrailingStopLoss {
 
         try {
           order = rApi.makeMarketStopOrder(ticker, quantity, OrderTransactionType.SELL,
-              TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss - .01));
+              TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss));
         } catch (RobinhoodApiException e) {
           // // TODO Auto-generated catch block
           // e.printStackTrace();
