@@ -44,18 +44,27 @@ public class RobinhoodAccountTrailingStopLoss {
   private static double stopLossPercent = .075;
   private static double lockInMultiple = .01;
   private static DecimalFormat df2 = new DecimalFormat("###,###.00");
-  private static List<String> tickersToIgnore =
-      new ArrayList<String>(Arrays.asList("GRVY", "GOOGL", "AMZN", "MSEX"));
+  private static List<String> tickersToIgnore = new ArrayList<String>(Arrays.asList());
+
+  private static List<String> superLongTermStocks =
+      new ArrayList<String>(Arrays.asList("GOOGL", "AMZN"));
+
+  private static List<String> longTermStocks = new ArrayList<String>(Arrays.asList("MSFT", "SNE",
+      "AAPL", "CRM", "NTDOY", "PRNT", "PG", "QQQ", "USB", "SBUX", "INFO", "JLL", "BABA"));
 
   private static List<String> shortTermStocks = new ArrayList<String>(
-      Arrays.asList("AKTS", "SQQQ", "TQQQ", "DFFN", "NOK", "CPSI", "CJJD", "VNET", "BIOS", "SSRM",
-          "COLD", "CNP", "BEL", "MSEX", "SCG", "SPA", "UPL", "CRMD", "FLO", "MITK", "XBIT"));
+      Arrays.asList("AKTS", "DFFN", "NOK", "CPSI", "CJJD", "VNET", "BIOS", "SSRM", "COLD", "CNP",
+          "BEL", "MSEX", "SCG", "SPA", "UPL", "CRMD", "FLO", "MITK", "XBIT", "ATRS"));
+
+  private static List<String> reallyShortTermStocks =
+      new ArrayList<String>(Arrays.asList("SQQQ", "TQQQ"));
 
   private static List<String> halfStopLossPercentStocks = new ArrayList<String>(Arrays.asList());
 
   private static Map<String, Double> rsiValue = new HashMap<String, Double>();
 
   private static Map<String, Integer> numStopLossChanges = new HashMap<String, Integer>();
+  private static double reallyShortTermCents = .05;
 
   public static void main(String[] args) {
     // String ticker = args[0];
@@ -127,7 +136,7 @@ public class RobinhoodAccountTrailingStopLoss {
             e.printStackTrace();
           }
 
-          //for post market processing
+          // for post market processing
           PostMarketCloseCommand.runCommand();
         } else {
           System.out.print(".");
@@ -266,8 +275,7 @@ public class RobinhoodAccountTrailingStopLoss {
     try {
       orders = rApi.getOrders();
     } catch (Exception e1) {
-      // TODO Auto-generated catch block
-      e1.printStackTrace();
+      System.out.println("getOrdersSafe Failed first time");
     }
 
 
@@ -284,8 +292,7 @@ public class RobinhoodAccountTrailingStopLoss {
         try {
           orders = rApi.getOrders();
         } catch (Exception e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+          System.out.println("getOrdersSafe Failed " + i + " times");
         }
 
         if (orders != null) {
@@ -307,7 +314,19 @@ public class RobinhoodAccountTrailingStopLoss {
 
     boolean isShortTermGain = false;
 
-    if (currentValue > averageBuyPrice && shortTermStocks.contains(ticker)) {
+    if (superLongTermStocks.contains(ticker)) {
+
+      stopLossValue = stopLossPercent * 1.5;
+
+      calculatedStopLoss = (double) (currentValue - (currentValue * stopLossValue));
+
+
+    } else if (reallyShortTermStocks.contains(ticker)) {
+      calculatedStopLoss = (float) (currentValue - reallyShortTermCents);
+      System.out
+          .println("reallyShortTerm " + ticker + " " + currentValue + " " + calculatedStopLoss);
+      isShortTermGain = true;
+    } else if (currentValue > averageBuyPrice && shortTermStocks.contains(ticker)) {
 
       calculatedStopLoss = (float) (currentValue - (currentValue * .01));
 
@@ -326,8 +345,8 @@ public class RobinhoodAccountTrailingStopLoss {
     TickerQuote currentQuote = null;
     try {
       currentQuote = rApi.getQuoteByTicker(ticker);
-    } catch (TickerNotFoundException e1) {
-      e1.printStackTrace();
+    } catch (Exception e1) {
+      System.out.println("getQuoteByTickerSafe Failed first times");
     }
 
     for (int i = 0; i < 10; i++) {
@@ -342,8 +361,8 @@ public class RobinhoodAccountTrailingStopLoss {
 
         try {
           currentQuote = rApi.getQuoteByTicker(ticker);
-        } catch (TickerNotFoundException e) {
-          e.printStackTrace();
+        } catch (Exception e) {
+          System.out.println("getQuoteByTickerSafe Failed " + i + " times");
         }
 
         if (currentQuote != null) {
@@ -387,7 +406,12 @@ public class RobinhoodAccountTrailingStopLoss {
   }
 
   private static List<Position> getAccountPositionsSafe(RobinhoodApi rApi) {
-    List<Position> pList = rApi.getAccountPositions();
+    List<Position> pList = null;
+    try {
+      pList = rApi.getAccountPositions();
+    } catch (Exception e1) {
+      System.out.println("getAccountPositionsSafe Failed first times");
+    }
 
     for (int i = 0; i < 10; i++) {
       if (pList == null) {
@@ -399,7 +423,11 @@ public class RobinhoodAccountTrailingStopLoss {
           e.printStackTrace();
         }
 
-        pList = rApi.getAccountPositions();
+        try {
+          pList = rApi.getAccountPositions();
+        } catch (Exception e) {
+          System.out.println("getAccountPositionsSafe Failed " + i + " times");
+        }
 
         if (pList != null) {
           break;
@@ -486,8 +514,7 @@ public class RobinhoodAccountTrailingStopLoss {
     try {
       order = rApi.cancelOrder(order);
     } catch (Exception e) {
-      // // TODO Auto-generated catch block
-      // e.printStackTrace();
+      System.out.println("cancelOrder Failed first time");
     }
 
     for (int i = 0; i < 10; i++) {
@@ -503,8 +530,7 @@ public class RobinhoodAccountTrailingStopLoss {
         try {
           order = rApi.cancelOrder(order);
         } catch (Exception e) {
-          // // TODO Auto-generated catch block
-          // e.printStackTrace();
+          System.out.println("cancelOrder Failed " + i + " times");
         }
 
         if (order != null) {
@@ -534,8 +560,7 @@ public class RobinhoodAccountTrailingStopLoss {
       order = rApi.makeMarketStopOrder(ticker, quantity, OrderTransactionType.SELL,
           TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss));
     } catch (TickerNotFoundException e) {
-      // // TODO Auto-generated catch block
-      // e.printStackTrace();
+      System.out.println("submitNewStopLoss Failed first time");
     }
 
     for (int i = 0; i < 10; i++) {
@@ -552,8 +577,7 @@ public class RobinhoodAccountTrailingStopLoss {
           order = rApi.makeMarketStopOrder(ticker, quantity, OrderTransactionType.SELL,
               TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss));
         } catch (RobinhoodApiException e) {
-          // // TODO Auto-generated catch block
-          // e.printStackTrace();
+          System.out.println("submitNewStopLoss Failed " + i + " times");
         }
 
         if (order != null) {
