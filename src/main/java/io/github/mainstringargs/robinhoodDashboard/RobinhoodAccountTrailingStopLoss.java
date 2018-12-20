@@ -44,7 +44,7 @@ public class RobinhoodAccountTrailingStopLoss {
   private static double stopLossPercent = .075;
   private static double lockInMultiple = .01;
   private static DecimalFormat df2 = new DecimalFormat("###,###.00");
-  private static List<String> tickersToIgnore = new ArrayList<String>(Arrays.asList());
+  private static List<String> tickersToIgnore = new ArrayList<String>(Arrays.asList("MSFT","SNE","XBIT","MTLS"));
 
   private static List<String> superLongTermStocks =
       new ArrayList<String>(Arrays.asList("GOOGL", "AMZN"));
@@ -65,6 +65,7 @@ public class RobinhoodAccountTrailingStopLoss {
 
   private static Map<String, Integer> numStopLossChanges = new HashMap<String, Integer>();
   private static double reallyShortTermCents = .05;
+  private static double shortTermCents = .15;
 
   public static void main(String[] args) {
     // String ticker = args[0];
@@ -314,7 +315,10 @@ public class RobinhoodAccountTrailingStopLoss {
 
     boolean isShortTermGain = false;
 
-    if (superLongTermStocks.contains(ticker)) {
+
+    if (longTermStocks.contains(ticker)) {
+
+    } else if (superLongTermStocks.contains(ticker)) {
 
       stopLossValue = stopLossPercent * 1.5;
 
@@ -326,9 +330,10 @@ public class RobinhoodAccountTrailingStopLoss {
       System.out
           .println("reallyShortTerm " + ticker + " " + currentValue + " " + calculatedStopLoss);
       isShortTermGain = true;
-    } else if (currentValue > averageBuyPrice && shortTermStocks.contains(ticker)) {
+    } else if (currentValue > averageBuyPrice) {
 
-      calculatedStopLoss = (float) (currentValue - (currentValue * .01));
+      //short term
+      calculatedStopLoss = (float) (currentValue - shortTermCents);
 
       isShortTermGain = true;
     }
@@ -476,7 +481,7 @@ public class RobinhoodAccountTrailingStopLoss {
       if (order.getTrigger().equals("stop") && order.getCancel() != null) {
         Instrument inst = rApi.getInstrumentByURL(order.getInstrument());
 
-        if (inst.getSymbol().equals(ticker)) {
+        if (inst!=null&& inst.getSymbol()!=null && inst.getSymbol().equals(ticker)) {
 
           // System.out.println(">>EXISTING " + ticker + " " + order.getRejectReason() + " "
           // + order.getTransactionState() + " " + order.getResponseCategory());
