@@ -44,13 +44,14 @@ public class RobinhoodAccountTrailingStopLoss {
   private static double stopLossPercent = .075;
   private static double lockInMultiple = .01;
   private static DecimalFormat df2 = new DecimalFormat("###,###.00");
-  private static List<String> tickersToIgnore = new ArrayList<String>(Arrays.asList("MSFT","SNE","XBIT","MTLS"));
+  private static List<String> tickersToIgnore =
+      new ArrayList<String>(Arrays.asList("AMZN", "GOOGL"));
 
-  private static List<String> superLongTermStocks =
-      new ArrayList<String>(Arrays.asList("GOOGL", "AMZN"));
+  private static List<String> superLongTermStocks = new ArrayList<String>(Arrays.asList());
 
-  private static List<String> longTermStocks = new ArrayList<String>(Arrays.asList("MSFT", "SNE",
-      "AAPL", "CRM", "NTDOY", "PRNT", "PG", "QQQ", "USB", "SBUX", "INFO", "JLL", "BABA"));
+  private static List<String> longTermStocks =
+      new ArrayList<String>(Arrays.asList("MSFT", "SNE", "AMZN", "CRM", "NTDOY", "PRNT", "PG",
+          "QQQ", "PYPL", "SBUX", "INFO", "JLL", "GOOGL", "BABA", "NKE", "CRSP"));
 
   private static List<String> shortTermStocks = new ArrayList<String>(
       Arrays.asList("AKTS", "DFFN", "NOK", "CPSI", "CJJD", "VNET", "BIOS", "SSRM", "COLD", "CNP",
@@ -64,19 +65,14 @@ public class RobinhoodAccountTrailingStopLoss {
   private static Map<String, Double> rsiValue = new HashMap<String, Double>();
 
   private static Map<String, Integer> numStopLossChanges = new HashMap<String, Integer>();
-  private static double reallyShortTermCents = .05;
-  private static double shortTermCents = .15;
+  private static double reallyShortTermCents = .10;
+  private static double shortTermCentsLow = .20;
+  private static double shortTermCentsHigh = 2.00;
 
   public static void main(String[] args) {
     // String ticker = args[0];
 
-    RobinhoodApi rApi = null;
-    try {
-      rApi = new RobinhoodApi(RobinhoodProperties.getProperty("robinhood.user", ""),
-          RobinhoodProperties.getProperty("robinhood.pass", ""));
-    } catch (RobinhoodApiException e) {
-      e.printStackTrace();
-    }
+    RobinhoodApi rApi = getRobinhoodAPI();
 
     String apiKey = AlphaVantageAPIKey.getAPIKey();
     int timeout = 3000;
@@ -120,15 +116,20 @@ public class RobinhoodAccountTrailingStopLoss {
 
     while (true) {
 
+
+      rApi = getRobinhoodAPI(); // refresh on each rotation
+
+
       if (!stockMarketIsOpen(rApi)) {
 
         // if (false) {
-
 
         if (!firstStockMarketClosed) {
 
           firstStockMarketClosed = true;
           System.out.print(new Date() + ": Stock market is closed");
+
+          numStopLossChanges.clear();
 
           try {
             Thread.sleep(stockMarketSleepTime);
@@ -271,6 +272,17 @@ public class RobinhoodAccountTrailingStopLoss {
 
   }
 
+  private static RobinhoodApi getRobinhoodAPI() {
+    RobinhoodApi rApi = null;
+    try {
+      rApi = new RobinhoodApi(RobinhoodProperties.getProperty("robinhood.user", ""),
+          RobinhoodProperties.getProperty("robinhood.pass", ""));
+    } catch (RobinhoodApiException e) {
+      e.printStackTrace();
+    }
+    return rApi;
+  }
+
   private static List<SecurityOrder> getOrdersSafe(RobinhoodApi rApi) {
     List<SecurityOrder> orders = null;
     try {
@@ -332,8 +344,17 @@ public class RobinhoodAccountTrailingStopLoss {
       isShortTermGain = true;
     } else if (currentValue > averageBuyPrice) {
 
-      //short term
-      calculatedStopLoss = (float) (currentValue - shortTermCents);
+      double removedValue = shortTermCentsHigh;
+      double diff = shortTermCentsHigh - shortTermCentsLow;
+
+      if (currentValue < 200.0) {
+        removedValue = shortTermCentsLow + (currentValue / 200.0) * diff;
+        // System.out.println("REMOVED VALUE "+removedValue);
+      }
+
+
+      // short term
+      calculatedStopLoss = (float) (currentValue - removedValue);
 
       isShortTermGain = true;
     }
@@ -445,7 +466,7 @@ public class RobinhoodAccountTrailingStopLoss {
 
   private static void refreshRSI(RobinhoodApi rApi, TechnicalIndicators ti) {
 
-    for (Position pos : rApi.getAccountPositions()) {
+    for (Position pos : getAccountPositionsSafe(rApi)) {
 
       String ticker = pos.getInstrumentElement().getSymbol();
 
@@ -481,7 +502,7 @@ public class RobinhoodAccountTrailingStopLoss {
       if (order.getTrigger().equals("stop") && order.getCancel() != null) {
         Instrument inst = rApi.getInstrumentByURL(order.getInstrument());
 
-        if (inst!=null&& inst.getSymbol()!=null && inst.getSymbol().equals(ticker)) {
+        if (inst != null && inst.getSymbol() != null && inst.getSymbol().equals(ticker)) {
 
           // System.out.println(">>EXISTING " + ticker + " " + order.getRejectReason() + " "
           // + order.getTransactionState() + " " + order.getResponseCategory());
@@ -607,6 +628,7 @@ public class RobinhoodAccountTrailingStopLoss {
 
   private static boolean stockMarketIsOpen(RobinhoodApi rApi) {
     MarketList mList = rApi.getMarketList();
+    MarketHours hours = null;
 
     for (int i = 0; i < 10; i++) {
       if (mList == null) {
@@ -637,50 +659,51 @@ public class RobinhoodAccountTrailingStopLoss {
       }
 
       if (nasdaq != null) {
-        MarketHours hours = rApi.getMarketHoursByURL(nasdaq.getTodaysHours());
+        hours = rApi.getMarketHoursByURL(nasdaq.getTodaysHours());
 
-        if (!hours.getIsOpen()) {
-          return false;
+        if (hours != null) {
+          if (!hours.getIsOpen()) {
+            return false;
+          }
+
+          Date openingTime = null;
+          Date closingTime = null;
+          if (!useExtendedHours) {
+            try {
+              openingTime = toCalendar(hours.getOpensAt()).getTime();
+            } catch (ParseException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
+            try {
+              closingTime = toCalendar(hours.getClosesAt()).getTime();
+            } catch (ParseException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
+          } else {
+            try {
+              openingTime = toCalendar(hours.getExtendedOpensAt()).getTime();
+            } catch (ParseException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
+            try {
+              closingTime = toCalendar(hours.getExtendedClosesAt()).getTime();
+            } catch (ParseException e) {
+              // TODO Auto-generated catch block
+              e.printStackTrace();
+            }
+          }
+
+          Date currentTime = new Date(System.currentTimeMillis());
+
+          return (openingTime.before(currentTime) && closingTime.after(currentTime));
         }
-
-        Date openingTime = null;
-        Date closingTime = null;
-        if (!useExtendedHours) {
-          try {
-            openingTime = toCalendar(hours.getOpensAt()).getTime();
-          } catch (ParseException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-          }
-          try {
-            closingTime = toCalendar(hours.getClosesAt()).getTime();
-          } catch (ParseException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-          }
-        } else {
-          try {
-            openingTime = toCalendar(hours.getExtendedOpensAt()).getTime();
-          } catch (ParseException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-          }
-          try {
-            closingTime = toCalendar(hours.getExtendedClosesAt()).getTime();
-          } catch (ParseException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-          }
-        }
-
-        Date currentTime = new Date(System.currentTimeMillis());
-
-        return (openingTime.before(currentTime) && closingTime.after(currentTime));
-
 
       }
     }
-    if (mList == null) {
+    if (mList == null || hours == null) {
       System.err.println("Robinhood is broken!");
     }
 
