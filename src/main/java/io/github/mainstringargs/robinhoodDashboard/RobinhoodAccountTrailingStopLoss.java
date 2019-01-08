@@ -585,7 +585,7 @@ public class RobinhoodAccountTrailingStopLoss {
     try {
       order = rApi.makeMarketStopOrder(ticker, quantity, OrderTransactionType.SELL,
           TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss));
-    } catch (TickerNotFoundException e) {
+    } catch (Exception e) {
       System.out.println("submitNewStopLoss Failed first time");
     }
 
@@ -602,7 +602,7 @@ public class RobinhoodAccountTrailingStopLoss {
         try {
           order = rApi.makeMarketStopOrder(ticker, quantity, OrderTransactionType.SELL,
               TimeInForce.GOOD_UNTIL_CANCELED, (float) (stopLoss));
-        } catch (RobinhoodApiException e) {
+        } catch (Exception e) {
           System.out.println("submitNewStopLoss Failed " + i + " times");
         }
 
