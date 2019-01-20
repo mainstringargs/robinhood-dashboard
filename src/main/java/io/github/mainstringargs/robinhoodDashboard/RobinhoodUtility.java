@@ -293,7 +293,7 @@ public class RobinhoodUtility {
   }
 
   public static String getISO8601SDate(Date date) {
-    DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mmZ");
+    DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
     String nowAsString = df.format(date);
     return nowAsString;
   }
